@@ -3,7 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Trefferbild Live</title>
+<title>Trefferbild</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Trefferbild">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#1D5C47">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
 <style>
 /* Layout: eine Spalte fürs Handy. Oben Laufzeit, in der Mitte die Scheibe als Hauptfläche, darunter der grosse Foto-Button und die Serien-Daten. */
@@ -125,6 +131,15 @@ video{display:block;width:100%;height:auto;background:#000}
 .meter b{position:absolute;top:0;bottom:0;width:3px;background:var(--warn)}
 .meter.hot{border-color:var(--hit)}
 @media (max-width:420px){.live{grid-template-columns:1fr}}
+textarea{width:100%;min-height:76px;padding:9px 12px;font-size:16px;background:var(--surface);border:1px solid var(--line);border-radius:6px;resize:vertical}
+textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.hist button{display:flex;justify-content:space-between;align-items:center;gap:12px;width:100%;min-height:48px;padding:9px 12px;text-align:left;font-size:14px;font-weight:400}
+.hist button span:last-child{font-family:var(--font-mono);white-space:nowrap}
+button.on{background:var(--soft);border-color:var(--accent);font-weight:600}
+#trend1,#trend2{display:block;border:1px solid var(--line);border-radius:6px;background:var(--surface)}
+#edWrap{background:#050706}
+#cvEdit{display:block;touch-action:none}
+.ver{text-align:center;margin-top:28px}
 </style>
 </head>
 <body>
@@ -157,12 +172,15 @@ video{display:block;width:100%;height:auto;background:#000}
     <p class="meta" id="targetInfo"></p>
     <p class="err" id="setupErr" role="alert"></p>
     <button id="btnNext" class="primary">Weiter zur Kalibrierung</button>
+    <button id="btnUpload" type="button">Beschossene Scheibe hochladen</button>
+    <button id="btnHist" type="button">Trainings und Verlauf</button>
     <div>
       <h2>Für gute Erkennung</h2>
       <ul class="tips">
         <li>Handy fest montieren (Stativ), Scheibe füllt das Bild.</li>
         <li>Nach jedem Schuss ein Foto aus derselben Position, gleiches Licht.</li>
         <li>Bei kleinen Löchern nah an die Scheibe oder mit Zoom arbeiten.</li>
+        <li>Foto-Auswertung: Scheibe möglichst gerade von vorne und gleichmässig beleuchtet fotografieren.</li>
       </ul>
     </div>
     <div id="histBox" hidden><h2>Letzte Trainings</h2><div class="hist" id="history"></div></div>
@@ -248,6 +266,41 @@ video{display:block;width:100%;height:auto;background:#000}
       </div>
     </div>
   </section>
+
+  <section id="v-hist" class="view" hidden>
+    <div><h1>Trainings</h1><p class="lead" id="histLead"></p></div>
+    <div id="trendBox" class="view" hidden>
+      <div><h2>Durchschnitt pro Schuss</h2><canvas id="trend1"></canvas></div>
+      <div><h2>Mittlerer Radius in mm</h2><canvas id="trend2"></canvas></div>
+    </div>
+    <div class="hist" id="histList"></div>
+    <div class="grid2"><button id="btnBackup" type="button">Sicherung erstellen</button><button id="btnRestore" type="button">Sicherung laden</button></div>
+    <p class="meta" id="histMsg" role="status"></p>
+    <button id="btnHistBack" type="button">Zurück</button>
+  </section>
+
+  <section id="v-edit" class="view" hidden>
+    <div><h1 id="edTitle">Treffer bearbeiten</h1><p class="lead" id="edLead"></p></div>
+    <div class="canvaswrap" id="edWrap"><canvas id="cvEdit" width="4" height="3"></canvas></div>
+    <p class="msg" id="edMsg" role="status"></p>
+    <div class="grid2">
+      <button id="btnEdAdd" type="button">+ Treffer setzen</button>
+      <button id="btnEdDel" type="button" disabled>Auswahl löschen</button>
+      <button id="btnEdAcc" type="button" hidden>Alle Vorschläge übernehmen</button>
+      <button id="btnEdRings" type="button">Ringe ausblenden</button>
+      <button id="btnEdFit" type="button">Ansicht zurücksetzen</button>
+    </div>
+    <div class="field"><span class="k">Ausgewählten Treffer fein verschieben</span>
+      <div class="grid4" id="edNudge">
+        <button type="button" data-x="-1" data-y="0" aria-label="Nach links" disabled>←</button>
+        <button type="button" data-x="0" data-y="-1" aria-label="Nach oben" disabled>↑</button>
+        <button type="button" data-x="0" data-y="1" aria-label="Nach unten" disabled>↓</button>
+        <button type="button" data-x="1" data-y="0" aria-label="Nach rechts" disabled>→</button>
+      </div>
+    </div>
+    <div class="actions"><button id="btnEdDone" class="primary" type="button">Fertig, auswerten</button><button id="btnEdCancel" type="button">Abbrechen</button></div>
+  </section>
+  <p class="meta ver">Trefferbild · Version 3</p>
 </div>
 
 <div class="sheet" id="sheet" hidden></div>
@@ -256,6 +309,8 @@ video{display:block;width:100%;height:auto;background:#000}
 <input type="file" id="refFileIn" accept="image/*" hidden>
 <input type="file" id="camIn" accept="image/*" capture="environment" hidden>
 <input type="file" id="multiIn" accept="image/*" multiple hidden>
+<input type="file" id="upIn" accept="image/*" hidden>
+<input type="file" id="restoreIn" accept=".json,application/json" hidden>
 
 <script>
 (function(){
@@ -398,15 +453,18 @@ function analyzeShot(prev, cur, w, h, expDiam){
   return {sh:sh, det:detectHit(prev, cur, w, h, sh.dx, sh.dy, expDiam)};
 }
 
-// Wertung: Kaliber-Rand zählt (Berührung der nächsthöheren Ringlinie), Dezimal linear
+// Wertung: Kaliber-Rand zählt (Berührung der nächsthöheren Ringlinie).
+// Dezimal: jede Ringzone wird in 10 gleiche Stufen geteilt, 10.9 im Zentrum, x.0 an der äusseren Ringlinie.
 function ringScore(dist, t){
-  var r10 = t.d10/2, rs = t.step/2, d = Math.max(0, dist - t.cal/2), ring;
-  if(d <= r10) ring = 10; else ring = 10 - Math.ceil((d - r10)/rs);
-  ring = Math.max(0, ring);
-  var dec = 11 - (d + (rs - r10))/rs;
-  dec = Math.min(10.9, Math.max(0, dec));
-  if(ring === 0) dec = Math.min(dec, 0.9);
-  else dec = Math.max(dec, ring);
+  var r10 = t.d10/2, rs = t.step/2, d = Math.max(0, dist - t.cal/2), ring, a, b;
+  if(d <= r10){ ring = 10; a = 0; b = r10; }
+  else {
+    ring = Math.max(0, 10 - Math.ceil((d - r10)/rs));
+    a = r10 + (9 - ring)*rs; b = a + rs;
+  }
+  if(ring === 0) return {ring:0, dec:0};
+  var f = Math.max(0, Math.min(1, (b - d)/(b - a)));
+  var dec = ring + Math.min(9, Math.floor(f*10 + 1e-9))/10;
   return {ring:ring, dec:Math.round(dec*10)/10};
 }
 
@@ -419,8 +477,9 @@ function seriesStats(shots, t, dist){
   for(i = 0; i < n; i++) for(j = i + 1; j < n; j++) spread = Math.max(spread, Math.hypot(xs[i] - xs[j], ys[i] - ys[j]));
   var meanR = sum(shots.map(function(s){ return Math.hypot(s.x - mx, s.y - my); }))/n;
   var sd = function(a, m){ return n > 1 ? Math.sqrt(sum(a.map(function(v){ return (v - m)*(v - m); }))/(n - 1)) : 0; };
+  var timed = shots.every(function(s){ return s.ts !== null && s.ts !== undefined; });
   var ints = [];
-  for(i = 1; i < n; i++) ints.push((shots[i].ts - shots[i - 1].ts)/1000);
+  if(timed) for(i = 1; i < n; i++) ints.push((shots[i].ts - shots[i - 1].ts)/1000);
   var half = Math.floor(n/2), h1 = null, h2 = null;
   if(n >= 4){
     h1 = sum(shots.slice(0, half).map(function(s){ return s.dec; }))/half;
@@ -432,8 +491,72 @@ function seriesStats(shots, t, dist){
     dec:sum(shots.map(function(s){ return s.dec; })), rings:sum(shots.map(function(s){ return s.ring; })),
     ints:ints, meanInt:ints.length ? sum(ints)/ints.length : null,
     minInt:ints.length ? Math.min.apply(null, ints) : null, maxInt:ints.length ? Math.max.apply(null, ints) : null,
-    dur:(shots[n - 1].ts - shots[0].ts)/1000, h1:h1, h2:h2
+    dur:timed ? (shots[n - 1].ts - shots[0].ts)/1000 : null, h1:h1, h2:h2
   };
+}
+
+// Kandidaten für Einschüsse in einem einzelnen Foto: Fleck, der in alle vier Richtungen
+// heller oder dunkler ist als seine Umgebung (Kanten und dünne Ringlinien fallen heraus).
+function findHoles(g, w, h, cx, cy, ppm, t, maxN){
+  var rpx = Math.max(2.5, t.cal/2*ppm);
+  var r1 = Math.max(1, Math.round(rpx*0.5)), o = Math.max(2*r1 + 1, Math.round(rpx*1.5));
+  var od = Math.round(o*0.7071);
+  var OFF = [[o, 0], [-o, 0], [0, o], [0, -o], [od, od], [-od, od], [od, -od], [-od, -od]];
+  var A = boxBlur(g, w, h, r1);
+  var Rout = (t.d10/2 + 9*t.step/2)*ppm + rpx, R2 = Rout*Rout;
+  var x0 = Math.max(o + 1, Math.floor(cx - Rout)), x1 = Math.min(w - o - 2, Math.ceil(cx + Rout));
+  var y0 = Math.max(o + 1, Math.floor(cy - Rout)), y1 = Math.min(h - o - 2, Math.ceil(cy + Rout));
+  var R = new Float32Array(w*h), top = 0, x, y, list = [];
+  for(y = y0; y <= y1; y++){
+    for(x = x0; x <= x1; x++){
+      var dx = x - cx, dy = y - cy; if(dx*dx + dy*dy > R2) continue;
+      var p = y*w + x, a0 = A[p], pos = 0, neg = 0, mn = 1e9, mx2 = -1e9, k2;
+      // 8 Vergleichsflächen rundum: eine Linie liegt immer mit zwei davon auf sich selbst, ein Loch nicht
+      for(k2 = 0; k2 < 8; k2++){
+        var dd = a0 - A[p + OFF[k2][1]*w + OFF[k2][0]];
+        if(dd < mn) mn = dd; if(dd > mx2) mx2 = dd;
+      }
+      var m = mn > 0 ? mn : (mx2 < 0 ? -mx2 : 0);
+      if(m > 0){ R[p] = m; if(m > top) top = m; }
+    }
+  }
+  var T = Math.max(0.3, 0.35*top), dl = Math.max(3, Math.round(1.2*rpx));
+  for(y = y0; y <= y1; y++) for(x = x0; x <= x1; x++){ var v = R[y*w + x]; if(v > T) list.push(y*w + x); }
+  list.sort(function(a, b){ return R[b] - R[a]; });
+  var out = [], minD2 = Math.pow(2*rpx, 2), i, j;
+  for(i = 0; i < list.length && out.length < maxN; i++){
+    var q = list[i], qx = q % w, qy = (q - qx)/w, ok = true;
+    for(j = 0; j < out.length; j++){ var ddx = out[j].px - qx, ddy = out[j].py - qy; if(ddx*ddx + ddy*ddy < minD2){ ok = false; break; } }
+    if(!ok) continue;
+    // Linien (Ringe, Kanten) bleiben in beide Richtungen entlang der Linie stark, Löcher nicht
+    var rq = R[q], ridge = false;
+    for(var k = 0; k < 8 && !ridge; k++){
+      var ang = k*Math.PI/8, ox = Math.round(dl*Math.cos(ang)), oy = Math.round(dl*Math.sin(ang));
+      var p1 = (qy + oy)*w + qx + ox, p2 = (qy - oy)*w + qx - ox;
+      if(p1 > 0 && p2 > 0 && p1 < R.length && p2 < R.length && R[p1] > 0.6*rq && R[p2] > 0.6*rq) ridge = true;
+    }
+    if(!ridge){
+      // Ringlinien verlaufen auf Kreisen um das Zentrum: dort entlang der Linie prüfen
+      var rr0 = Math.hypot(qx - cx, qy - cy), th = Math.atan2(qy - cy, qx - cx), dth = dl/Math.max(rr0, dl*1.5), side = 0;
+      if(rr0 > 2*rpx) [-1, 1].forEach(function(sg){
+        var ax = Math.round(cx + rr0*Math.cos(th + sg*dth)), ay = Math.round(cy + rr0*Math.sin(th + sg*dth)), mx = 0;
+        for(var yy2 = ay - 2; yy2 <= ay + 2; yy2++) for(var xx2 = ax - 2; xx2 <= ax + 2; xx2++){
+          if(xx2 < 0 || yy2 < 0 || xx2 >= w || yy2 >= h) continue;
+          if(R[yy2*w + xx2] > mx) mx = R[yy2*w + xx2];
+        }
+        if(mx > 0.6*rq) side++;
+      });
+      if(side === 2) ridge = true;
+    }
+    if(ridge) continue;
+    var sx = 0, sy = 0, sm = 0, rr = Math.ceil(rpx), thr = 0.5*R[q];
+    for(var yy = qy - rr; yy <= qy + rr; yy++) for(var xx = qx - rr; xx <= qx + rr; xx++){
+      if(xx < 0 || yy < 0 || xx >= w || yy >= h) continue;
+      var vv = R[yy*w + xx]; if(vv > thr){ sx += vv*xx; sy += vv*yy; sm += vv; }
+    }
+    out.push({x:sx/sm, y:sy/sm, px:qx, py:qy, resp:R[q]});
+  }
+  return out;
 }
 // ==CORE-END==
 
@@ -453,9 +576,7 @@ var tick = function(ms){ return new Promise(function(r){ setTimeout(r, ms || 30)
 var TARGETS = {
   lp10:{name:'Luftpistole 10 m', cal:4.5, d10:11.5, step:16, dist:10},
   lg10:{name:'Luftgewehr 10 m', cal:4.5, d10:0.5, step:5, dist:10},
-  kk50:{name:'Kleinkaliber 50 m', cal:5.6, d10:10.4, step:16, dist:50},
-  p50:{name:'Pistole 50 m / 25 m Präzision', cal:5.6, d10:50, step:50, dist:50},
-  custom:{name:'Eigene Scheibe', cal:5.6, d10:10, step:16, dist:50}
+  custom:{name:'Eigene Scheibe', cal:4.5, d10:11.5, step:16, dist:10}
 };
 
 var S = {
@@ -466,7 +587,7 @@ var S = {
 
 // ---------- Ansichten ----------
 function show(id){
-  ['v-setup', 'v-calib', 'v-shoot'].forEach(function(v){ $(v).hidden = (v !== id); });
+  ['v-setup', 'v-calib', 'v-shoot', 'v-hist', 'v-edit'].forEach(function(v){ $(v).hidden = (v !== id); });
   window.scrollTo(0, 0);
 }
 
@@ -494,22 +615,18 @@ function updateInfo(){
   var d10 = +$('inD10').value, step = +$('inStep').value, cal = +$('inCal').value;
   if(d10 > 0 && step > 0) $('targetInfo').textContent = 'Ring 1: Ø ' + (d10 + 9*step).toFixed(1) + ' mm · Zehner: Ø ' + d10 + ' mm · Kaliber ' + cal + ' mm';
 }
-function renderHistory(){
-  var hist = store.get('trefferbild.history', []);
-  $('histBox').hidden = !hist.length;
-  var box = $('history'); box.innerHTML = '';
-  hist.slice(0, 5).forEach(function(h){
-    var d = new Date(h.t0), row = document.createElement('div');
-    var a = document.createElement('span'), b = document.createElement('span');
-    a.textContent = pad(d.getDate()) + '.' + pad(d.getMonth() + 1) + '.' + d.getFullYear() + ' · ' + h.name;
-    b.textContent = h.n + ' Sch. · ' + h.dec.toFixed(1);
-    row.appendChild(a); row.appendChild(b); box.appendChild(row);
-  });
+async function renderHistory(){
+  var box = $('history'); box.innerHTML = ''; $('histBox').hidden = true;
+  var all;
+  try{ all = await dbAll(); }catch(e){ return; }
+  all.sort(function(a, b){ return b.t0 - a.t0; });
+  all.slice(0, 3).forEach(function(r){ box.appendChild(histRow(r)); });
+  $('histBox').hidden = !all.length;
 }
-$('btnNext').addEventListener('click', function(){
+function readSetup(){
   var cal = +$('inCal').value, d10 = +$('inD10').value, step = +$('inStep').value, dist = +$('inDist').value, len = +$('selLen').value;
   if(!(cal > 0 && d10 > 0 && step > 0 && dist > 0)){
-    $('setupErr').textContent = 'Bitte Kaliber, Zehner, Ringstufe und Distanz als Zahlen grösser 0 eingeben.'; return;
+    $('setupErr').textContent = 'Bitte Kaliber, Zehner, Ringstufe und Distanz als Zahlen grösser 0 eingeben.'; return false;
   }
   $('setupErr').textContent = '';
   var id = $('selTarget').value, base = TARGETS[id];
@@ -517,9 +634,28 @@ $('btnNext').addEventListener('click', function(){
   S.t = {name:base.name + (changed && id !== 'custom' ? ' (angepasst)' : ''), cal:cal, d10:d10, step:step};
   S.dist = dist; S.len = len;
   store.set('trefferbild.cfg', {target:id, dist:dist, len:len});
+  return true;
+}
+var CAL_LEAD = $('calLead').textContent;
+function enterCalib(){
   S.ref = null; S.C = null;
-  $('calCtl').hidden = true; $('btnCalOk').hidden = true; $('calMsg').hidden = true; $('calPh').hidden = !!S.stream; $('calVid').hidden = !S.stream; $('cvCal').hidden = !!S.stream;
+  var up = S.upload;
+  $('calCtl').hidden = true; $('btnCalOk').hidden = true; $('calMsg').hidden = true;
+  $('btnCamStart').hidden = up || !!S.stream;
+  $('btnRefGrab').hidden = up || !S.stream;
+  if(!up && S.stream){ S.calLive = true; $('btnRefGrab').textContent = 'Referenzbild aufnehmen'; }
+  $('calPh').hidden = up ? false : !!S.stream; $('calPh').textContent = up ? 'Noch kein Foto' : 'Kamera ist noch nicht gestartet';
+  $('calVid').hidden = up || !S.stream; $('cvCal').hidden = !up && !!S.stream;
+  $('calLead').textContent = up ? 'Lege die grünen Ringe deckungsgleich über die Scheibe. Das Foto sollte die Scheibe möglichst gerade von vorne zeigen, sonst werden die Werte ungenau.' : CAL_LEAD;
+  $('btnRefFile').textContent = up ? 'Anderes Foto wählen' : 'Foto auswählen';
   show('v-calib');
+}
+$('btnNext').addEventListener('click', function(){ if(!readSetup()) return; S.upload = false; enterCalib(); });
+$('btnUpload').addEventListener('click', function(){ if(!readSetup()) return; S.upload = true; $('upIn').click(); });
+$('upIn').addEventListener('change', async function(ev){
+  var f = ev.target.files && ev.target.files[0]; ev.target.value = '';
+  if(!f) return;
+  enterCalib(); await loadRef(f);
 });
 
 // ---------- Foto laden ----------
@@ -691,6 +827,8 @@ $('btnCalOk').addEventListener('click', function(){
   var C = S.C;
   if(!C) return;
   S.calib = {cx:C.cx, cy:C.cy, ppm:C.ppm};
+  if(S.upload){ startUploadEdit(); return; }
+  S.meta = {mode:'live', tEnd:null, note:''}; S.rec = null; S.img = null; S.from = 'new';
   S.base = {g:S.ref.g, w:S.ref.w, h:S.ref.h, off:{x:0, y:0}, canvas:S.ref.canvas};
   S.view = {canvas:S.ref.canvas, off:{x:0, y:0}};
   S.stack = []; S.shots = []; S.series = []; S.seriesNo = 1; S.pending = null; S.queue = []; S.mode = 'idle'; S.t0 = 0; S.showRings = true;
@@ -821,11 +959,12 @@ async function commitShot(rx, ry, ts, auto, conf, p, off){
   setMsg('Schuss ' + shot.n + ': ' + shot.dec.toFixed(1) + ' (Ring ' + shot.ring + ') · ' + posText(shot) + (auto ? ' · automatisch erkannt (' + conf + ')' : ' · von Hand gesetzt'));
   if(openShots().length >= S.len) await closeSeries();
 }
-function fillShot(s){
-  s.x = (s.rx - S.calib.cx)/S.calib.ppm;
-  s.y = -(s.ry - S.calib.cy)/S.calib.ppm;
+function fillShot(s, calib, t){
+  calib = calib || S.calib; t = t || S.t;
+  s.x = (s.rx - calib.cx)/calib.ppm;
+  s.y = -(s.ry - calib.cy)/calib.ppm;
   s.dist = Math.hypot(s.x, s.y);
-  var sc = ringScore(s.dist, S.t); s.ring = sc.ring; s.dec = sc.dec;
+  var sc = ringScore(s.dist, t); s.ring = sc.ring; s.dec = sc.dec;
 }
 function posText(s){
   return fmt(Math.abs(s.x)) + ' mm ' + (s.x >= 0 ? 'rechts' : 'links') + ', ' + fmt(Math.abs(s.y)) + ' mm ' + (s.y >= 0 ? 'oben' : 'unten');
@@ -875,6 +1014,7 @@ async function closeSeries(){
   S.series.push(ser);
   S.seriesNo++; S.stack = []; S.mode = 'idle';
   paintShoot(); updateUI();
+  persist();
   var r = await showSeriesSheet(ser);
   if(r === 'end') finish();
 }
@@ -921,8 +1061,8 @@ function drawGroup(cv, shots, st){
   }
 }
 
-function hintHtml(st){
-  if(st.n < 3) return '<p>Für eine Aussage zur Treffpunktlage braucht es mindestens 3 Schüsse.</p>';
+function hintList(st){
+  if(st.n < 3) return ['Für eine Aussage zur Treffpunktlage braucht es mindestens 3 Schüsse.'];
   var out = [], off = st.offset, dist = S.dist;
   if(off < 0.6*st.meanR){
     out.push('Die Gruppe liegt zentriert. Ihr Schwerpunkt weicht ' + fmt(off) + ' mm vom Zentrum ab, weniger als die Streuung (mittlerer Radius ' + fmt(st.meanR) + ' mm).');
@@ -930,38 +1070,41 @@ function hintHtml(st){
     var hx = Math.abs(st.mpi.x) >= 0.3*off, vy = Math.abs(st.mpi.y) >= 0.3*off;
     var where = [hx ? (st.mpi.x > 0 ? 'rechts' : 'links') : null, vy ? (st.mpi.y > 0 ? 'oben' : 'unten') : null].filter(Boolean).join(' ');
     var fix = [hx ? (st.mpi.x > 0 ? 'links' : 'rechts') : null, vy ? (st.mpi.y > 0 ? 'unten' : 'oben') : null].filter(Boolean).join(' und ');
-    out.push('Die Gruppe liegt ' + where + ' vom Zentrum (' + fmt(off) + ' mm, ≈ ' + fmt(off/dist, 2) + ' mrad auf ' + dist + ' m). Zum Zentrieren den Treffpunkt nach ' + fix + ' verlegen.');
+    out.push('Die Gruppe liegt ' + where + ' vom Zentrum (' + fmt(off) + ' mm, ca. ' + fmt(off/dist, 2) + ' mrad auf ' + dist + ' m). Zum Zentrieren den Treffpunkt nach ' + fix + ' verlegen.');
   }
-  if(st.n >= 4 && st.sdx > 1.5*st.sdy) out.push('Die Streuung ist horizontal deutlich grösser (σx ' + fmt(st.sdx) + ' mm, σy ' + fmt(st.sdy) + ' mm).');
-  if(st.n >= 4 && st.sdy > 1.5*st.sdx) out.push('Die Streuung ist vertikal deutlich grösser (σy ' + fmt(st.sdy) + ' mm, σx ' + fmt(st.sdx) + ' mm).');
+  if(st.n >= 4 && st.sdx > 1.5*st.sdy) out.push('Die Streuung ist horizontal deutlich grösser (Standardabweichung x ' + fmt(st.sdx) + ' mm, y ' + fmt(st.sdy) + ' mm).');
+  if(st.n >= 4 && st.sdy > 1.5*st.sdx) out.push('Die Streuung ist vertikal deutlich grösser (Standardabweichung y ' + fmt(st.sdy) + ' mm, x ' + fmt(st.sdx) + ' mm).');
   if(st.h1 !== null && Math.abs(st.h2 - st.h1) >= 0.3){
     out.push(st.h2 < st.h1
       ? 'In der zweiten Hälfte sinkt der Schnitt von ' + fmt(st.h1) + ' auf ' + fmt(st.h2) + ' pro Schuss. Die Leistung lässt gegen Serienende nach.'
       : 'In der zweiten Hälfte steigt der Schnitt von ' + fmt(st.h1) + ' auf ' + fmt(st.h2) + ' pro Schuss.');
   }
-  return out.map(function(t){ return '<p>' + t + '</p>'; }).join('');
+  return out;
 }
+function hintHtml(st){ return hintList(st).map(function(t){ return '<p>' + t + '</p>'; }).join(''); }
 
 function shotsTable(shots){
   var rows = shots.map(function(s, i){
-    var prev = i ? shots[i - 1] : null;
-    return '<tr><td>' + s.n + '</td><td>' + hms(s.ts) + '</td><td>' + (prev ? ((s.ts - prev.ts)/1000).toFixed(0) : '–') + '</td><td>' + s.dec.toFixed(1) + '</td><td>' + sgn(s.x) + '</td><td>' + sgn(s.y) + '</td></tr>';
+    var prev = i ? shots[i - 1] : null, timed = s.ts !== null && s.ts !== undefined, ptimed = prev && prev.ts !== null && prev.ts !== undefined;
+    return '<tr><td>' + s.n + '</td><td>' + (timed ? hms(s.ts) : '–') + '</td><td>' + (timed && ptimed ? ((s.ts - prev.ts)/1000).toFixed(0) : '–') + '</td><td>' + s.dec.toFixed(1) + '</td><td>' + sgn(s.x) + '</td><td>' + sgn(s.y) + '</td></tr>';
   }).join('');
   return '<div class="tbl"><table><thead><tr><th>Nr</th><th>Zeit</th><th>Δ s</th><th>Wert</th><th>x mm</th><th>y mm</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
 }
 
+function statsRows(st){
+  var r = [['Ringe ganzzahlig', String(st.rings)]];
+  if(st.dur !== null) r.push(['Zeitraum', dur(st.dur)]);
+  if(st.meanInt !== null) r.push(['Ø Abstand der Schüsse', fmt(st.meanInt, 0) + ' s (' + fmt(st.minInt, 0) + '–' + fmt(st.maxInt, 0) + ')']);
+  r.push(['Treffpunktlage x / y', sgn(st.mpi.x) + ' / ' + sgn(st.mpi.y) + ' mm']);
+  r.push(['Abstand vom Zentrum', fmt(st.offset) + ' mm']);
+  r.push(['Streukreis (grösster Abstand)', fmt(st.spread) + ' mm']);
+  r.push(['Mittlerer Radius', fmt(st.meanR) + ' mm']);
+  r.push(['Standardabweichung x / y', fmt(st.sdx) + ' / ' + fmt(st.sdy) + ' mm']);
+  if(st.h1 !== null) r.push(['Schnitt 1. / 2. Hälfte', fmt(st.h1) + ' / ' + fmt(st.h2)]);
+  return r;
+}
 function statsBlock(st){
-  var h = '';
-  h += kv('Ringe ganzzahlig', st.rings);
-  h += kv('Zeitraum', dur(st.dur));
-  if(st.meanInt !== null) h += kv('Ø Abstand der Schüsse', fmt(st.meanInt, 0) + ' s (' + fmt(st.minInt, 0) + '–' + fmt(st.maxInt, 0) + ')');
-  h += kv('Treffpunktlage x / y', sgn(st.mpi.x) + ' / ' + sgn(st.mpi.y) + ' mm');
-  h += kv('Abstand vom Zentrum', fmt(st.offset) + ' mm');
-  h += kv('Streukreis (grösster Abstand)', fmt(st.spread) + ' mm');
-  h += kv('Mittlerer Radius', fmt(st.meanR) + ' mm');
-  h += kv('Streuung σx / σy', fmt(st.sdx) + ' / ' + fmt(st.sdy) + ' mm');
-  if(st.h1 !== null) h += kv('Schnitt 1. / 2. Hälfte', fmt(st.h1) + ' / ' + fmt(st.h2));
-  return '<div class="kvs">' + h + '</div>';
+  return '<div class="kvs">' + statsRows(st).map(function(r){ return kv(r[0], r[1]); }).join('') + '</div>';
 }
 
 function showSeriesSheet(ser){
@@ -986,7 +1129,7 @@ function showSeriesSheet(ser){
 }
 
 // ---------- Abschluss ----------
-function finish(){
+async function finish(){
   if(S.phase !== 'shoot') return;
   var open = openShots();
   if(open.length){
@@ -994,24 +1137,26 @@ function finish(){
     S.seriesNo++;
   }
   S.phase = 'summary'; S.pending = null; S.queue = [];
+  S.meta.tEnd = Date.now();
   stopMedia();
   clearInterval(S.timer);
   try{ if(S.wake) S.wake.release(); }catch(e){}
   S.wake = null;
-  var total = S.shots.reduce(function(p, s){ return p + s.dec; }, 0);
-  if(S.shots.length){
-    var hist = store.get('trefferbild.history', []);
-    hist.unshift({t0:S.t0, name:S.t.name, n:S.shots.length, dec:total, ser:S.series.map(function(s){ return {n:s.shots.length, dec:s.stats.dec}; })});
-    store.set('trefferbild.history', hist.slice(0, 30));
-  }
+  await persist();
   showSummary();
 }
 
+function leaveSummary(){
+  $('sheet').hidden = true;
+  if(S.from === 'hist') showHist(); else resetAll();
+}
+
 function showSummary(){
-  var sh = $('sheet'), shots = S.shots, all = seriesStats(shots, S.t, S.dist);
+  var sh = $('sheet'), shots = S.shots, all = seriesStats(shots, S.t, S.dist), upl = S.meta.mode === 'upload', hist = S.from === 'hist';
+  sh.hidden = false;
   if(!all){
     sh.innerHTML = '<div class="sheet-in"><h1>Training beendet</h1><p class="lead">Es wurden keine Schüsse erfasst.</p><button id="shNew" class="primary">Neues Training</button></div>';
-    sh.hidden = false; $('shNew').onclick = resetAll; return;
+    $('shNew').onclick = leaveSummary; return;
   }
   var rows = S.series.map(function(s){
     var st = s.stats;
@@ -1022,56 +1167,71 @@ function showSummary(){
     var a = S.series[0].stats, b = S.series[S.series.length - 1].stats, da = a.dec/a.n, db = b.dec/b.n;
     if(Math.abs(db - da) >= 0.2) trend = '<p>Schnitt pro Schuss: Serie 1 mit ' + fmt(da) + ', letzte Serie mit ' + fmt(db) + (db < da ? '. Die Leistung hat im Verlauf nachgelassen.' : '. Du hast dich im Verlauf gesteigert.') + '</p>';
   }
+  var when = upl ? 'Fotoauswertung vom ' + dateStr(S.t0) : dateStr(S.t0) + ' · Start ' + hms(S.t0) + (S.meta.tEnd ? ', Dauer ' + dur((S.meta.tEnd - S.t0)/1000) : '');
   sh.innerHTML =
     '<div class="sheet-in">' +
-    '<div><h1>Training beendet</h1><p class="lead">' + S.t.name + ' · ' + S.dist + ' m · Start ' + hms(S.t0) + ', Dauer ' + dur((Date.now() - S.t0)/1000) + '</p></div>' +
+    '<div><h1>' + (hist ? 'Training' : (upl ? 'Auswertung' : 'Training beendet')) + '</h1><p class="lead">' + S.t.name + ' · ' + S.dist + ' m · ' + when + '</p></div>' +
     '<div class="score"><b>' + all.dec.toFixed(1) + '</b><span>Dezimal · ' + shots.length + ' Schuss · Ø ' + fmt(all.dec/all.n) + '</span></div>' +
     '<canvas id="grpAll"></canvas>' +
     '<div class="tbl"><table><thead><tr><th>Serie</th><th>Sch.</th><th>Dez.</th><th>Streu mm</th><th>x mm</th><th>y mm</th><th>Ø s</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
     statsBlock(all) +
     '<div class="notes">' + trend + hintHtml(all) + '</div>' +
-    '<div class="actions"><button id="shCsv" class="primary">Daten als CSV speichern</button><button id="shNew">Neues Training</button></div>' +
-    '<p class="err" id="csvMsg" role="status"></p>' +
+    '<div class="field"><label for="shNote">Notiz</label><textarea id="shNote" rows="3" placeholder="Zum Beispiel Waffe, Munition, Befinden"></textarea></div>' +
+    '<div class="actions"><button id="shPdf" class="primary">PDF-Bericht</button>' +
+    '<div class="grid2"><button id="shCsv">CSV-Daten</button><button id="shEdit">Treffer bearbeiten</button></div>' +
+    '<div class="grid2"><button id="shDel">Training löschen</button><button id="shNew">' + (hist ? 'Zum Verlauf' : 'Neues Training') + '</button></div></div>' +
+    '<p class="err" id="csvMsg" role="status">' + (S.dbOk ? '' : 'Dieses Training konnte im Browser nicht gespeichert werden. Exportiere es als PDF oder CSV.') + '</p>' +
     '</div>';
-  sh.hidden = false; sh.scrollTop = 0;
+  sh.scrollTop = 0;
   drawGroup($('grpAll'), shots, all);
-  $('shNew').onclick = resetAll;
+  $('shNote').value = S.meta.note || '';
+  $('shNote').addEventListener('change', function(){ S.meta.note = this.value; persist(); });
+  $('shPdf').onclick = exportPdf;
   $('shCsv').onclick = exportCsv;
+  $('shEdit').onclick = editCurrent; $('shEdit').hidden = !curImage();
+  $('shNew').onclick = leaveSummary;
+  var armed = false, tm = null, del = $('shDel');
+  del.hidden = !S.rec;
+  del.onclick = async function(){
+    if(!armed){
+      armed = true; del.textContent = 'Wirklich löschen? Nochmals tippen';
+      tm = setTimeout(function(){ armed = false; del.textContent = 'Training löschen'; }, 5000); return;
+    }
+    clearTimeout(tm);
+    try{ await dbDel(S.rec.id); }catch(e){}
+    S.rec = null; leaveSummary();
+  };
 }
 
 function buildCsv(){
   var rows = [['Training_Start', 'Serie', 'Schuss', 'Zeit', 'Sekunden_seit_Start', 'Intervall_s', 'X_mm', 'Y_mm', 'Abstand_mm', 'Ring', 'Dezimal', 'Erkennung']];
-  var d0 = new Date(S.t0), stamp = d0.getFullYear() + '-' + pad(d0.getMonth() + 1) + '-' + pad(d0.getDate()) + ' ' + hms(S.t0);
+  var stamp = dateStr(S.t0) + ' ' + hms(S.t0);
   S.shots.forEach(function(s, i){
-    var d = new Date(s.ts), z = d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + hms(s.ts);
-    rows.push([stamp, s.series, s.n, z, ((s.ts - S.t0)/1000).toFixed(0), i ? ((s.ts - S.shots[i - 1].ts)/1000).toFixed(0) : '', s.x.toFixed(2), s.y.toFixed(2), s.dist.toFixed(2), s.ring, s.dec.toFixed(1), s.auto ? 'automatisch' : 'manuell']);
+    var timed = s.ts !== null && s.ts !== undefined, prev = i ? S.shots[i - 1] : null, ptimed = prev && prev.ts !== null && prev.ts !== undefined;
+    rows.push([stamp, s.series, s.n, timed ? dateStr(s.ts) + ' ' + hms(s.ts) : '', timed ? ((s.ts - S.t0)/1000).toFixed(0) : '', timed && ptimed ? ((s.ts - prev.ts)/1000).toFixed(0) : '', s.x.toFixed(2), s.y.toFixed(2), s.dist.toFixed(2), s.ring, s.dec.toFixed(1), s.auto ? 'automatisch' : 'von Hand']);
   });
   return '﻿' + rows.map(function(r){ return r.join(';'); }).join('\r\n');
 }
 async function exportCsv(){
-  var msg = $('csvMsg'), csv = buildCsv(), d = new Date(S.t0);
-  var name = 'trefferbild-' + d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) + '-' + pad(d.getHours()) + pad(d.getMinutes()) + '.csv';
+  var msg = $('csvMsg');
   try{
-    var dl = window.claude && window.claude.use ? await window.claude.use('downloads') : null;
-    if(dl){ await dl.save({filename:name, data:csv}); msg.textContent = 'CSV gespeichert.'; return; }
-    var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv'})); a.download = name;
-    document.body.appendChild(a); a.click();
-    setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 1500);
-    msg.textContent = 'CSV gespeichert (Ordner Downloads).'; return;
-  }catch(e){
-    if(e && e.code === 'declined'){ msg.textContent = 'Speichern abgebrochen.'; return; }
-  }
+    var r = await deliverFile(buildCsv(), fileBase() + '.csv', 'text/csv');
+    msg.textContent = r === 'abbruch' ? 'Abgebrochen.' : 'CSV bereit.';
+  }catch(e){ msg.textContent = 'Die CSV-Datei konnte nicht ausgegeben werden.'; }
+}
+async function exportPdf(){
+  var msg = $('csvMsg'); msg.textContent = '';
   try{
-    await navigator.clipboard.writeText(csv);
-    msg.textContent = 'Speichern ist hier nicht möglich. Die CSV-Daten liegen in der Zwischenablage.';
-  }catch(e){
-    msg.textContent = 'Speichern und Kopieren sind hier nicht möglich.';
-  }
+    var bytes = reportPdf();
+    var r = await deliverFile(bytes, fileBase() + '.pdf', 'application/pdf');
+    msg.textContent = r === 'abbruch' ? 'Abgebrochen.' : 'PDF bereit.';
+  }catch(e){ msg.textContent = 'Das PDF konnte nicht erstellt werden.'; }
 }
 
 function resetAll(){
   $('sheet').hidden = true; $('sheet').innerHTML = '';
   S.phase = 'setup'; S.shots = []; S.series = []; S.seriesNo = 1; S.stack = []; S.base = null; S.view = null; S.ref = null; S.calib = null; S.pending = null; S.queue = []; S.t0 = 0;
+  S.upload = false; S.img = null; S.rec = null; S.from = 'new'; S.meta = {mode:'live', tEnd:null, note:''}; E = null;
   $('clock').hidden = true;
   stopMedia(); $('btnCamStart').hidden = false; $('btnRefGrab').hidden = true;
   renderHistory(); show('v-setup');
@@ -1191,6 +1351,627 @@ $('btnRefGrab').addEventListener('click', function(){
     $('calVid').hidden = false; $('cvCal').hidden = true; $('calCtl').hidden = true; $('btnCalOk').hidden = true;
   }
 });
+
+
+// ---------- Speicher (IndexedDB) ----------
+S.meta = {mode:'live', tEnd:null, note:''}; S.img = null; S.rec = null; S.from = 'new'; S.upload = false; S.dbOk = true; S.backup = null;
+var IDB = {db:null};
+function idbOpen(){
+  if(IDB.db) return Promise.resolve(IDB.db);
+  return new Promise(function(res, rej){
+    try{
+      if(!window.indexedDB){ rej(new Error('IndexedDB fehlt')); return; }
+      var rq = indexedDB.open('trefferbild', 1);
+      rq.onupgradeneeded = function(){ if(!rq.result.objectStoreNames.contains('trainings')) rq.result.createObjectStore('trainings', {keyPath:'id'}); };
+      rq.onsuccess = function(){ IDB.db = rq.result; res(IDB.db); };
+      rq.onerror = function(){ rej(rq.error || new Error('IndexedDB Fehler')); };
+      rq.onblocked = function(){ rej(new Error('blockiert')); };
+    }catch(e){ rej(e); }
+  });
+}
+function idbReq(mode, fn){
+  return idbOpen().then(function(db){
+    return new Promise(function(res, rej){
+      var tx = db.transaction('trainings', mode), rq = fn(tx.objectStore('trainings'));
+      tx.oncomplete = function(){ res(rq ? rq.result : undefined); };
+      tx.onerror = function(){ rej(tx.error); };
+      tx.onabort = function(){ rej(tx.error || new Error('abgebrochen')); };
+    });
+  });
+}
+var dbPut = function(rec){ return idbReq('readwrite', function(st){ return st.put(rec); }); };
+var dbAll = function(){ return idbReq('readonly', function(st){ return st.getAll(); }); };
+var dbDel = function(id){ return idbReq('readwrite', function(st){ return st.delete(id); }); };
+
+function toBlob(cv){
+  return new Promise(function(res){ try{ cv.toBlob(function(b){ res(b); }, 'image/jpeg', 0.85); }catch(e){ res(null); } });
+}
+function blobToCanvas(blob){
+  return new Promise(function(res, rej){
+    var url = URL.createObjectURL(blob), img = new Image();
+    img.onload = function(){
+      var c = document.createElement('canvas'); c.width = img.naturalWidth; c.height = img.naturalHeight;
+      c.getContext('2d').drawImage(img, 0, 0); URL.revokeObjectURL(url); res(c);
+    };
+    img.onerror = function(){ URL.revokeObjectURL(url); rej(new Error('Bild')); };
+    img.src = url;
+  });
+}
+function blobToDataUrl(blob){
+  return new Promise(function(res, rej){ var fr = new FileReader(); fr.onload = function(){ res(fr.result); }; fr.onerror = function(){ rej(fr.error); }; fr.readAsDataURL(blob); });
+}
+function plainShot(s){
+  return {series:s.series, n:s.n, ts:(s.ts === undefined ? null : s.ts), rx:s.rx, ry:s.ry, x:s.x, y:s.y, dist:s.dist, ring:s.ring, dec:s.dec, auto:!!s.auto, conf:s.conf || ''};
+}
+function analysisOf(){
+  var all = seriesStats(S.shots, S.t, S.dist);
+  if(!all) return null;
+  return {
+    n:all.n, dec:all.dec, avg:all.dec/all.n, rings:all.rings, mpiX:all.mpi.x, mpiY:all.mpi.y, offset:all.offset,
+    spread:all.spread, meanR:all.meanR, sdx:all.sdx, sdy:all.sdy, meanInt:all.meanInt,
+    series:S.series.map(function(s){
+      var st = s.stats;
+      return {no:s.no, n:st.n, dec:st.dec, rings:st.rings, spread:st.spread, meanR:st.meanR, mpiX:st.mpi.x, mpiY:st.mpi.y, sdx:st.sdx, sdy:st.sdy, meanInt:st.meanInt};
+    })
+  };
+}
+function regroup(){
+  var map = {}, order = [];
+  S.shots.forEach(function(s){ if(!map[s.series]){ map[s.series] = []; order.push(s.series); } map[s.series].push(s); });
+  order.sort(function(a, b){ return a - b; });
+  S.series = order.map(function(no){ return {no:no, shots:map[no], stats:seriesStats(map[no], S.t, S.dist)}; });
+  S.seriesNo = (order.length ? order[order.length - 1] : 0) + 1;
+}
+// Reihenfolge und Serien neu nummerieren (Foto-Auswertung: Serien in Setz-Reihenfolge)
+function renumber(shots, mode, len){
+  var last = 0, cnt = {};
+  shots.forEach(function(s, i){
+    if(mode === 'upload') s.series = Math.floor(i/len) + 1;
+    else if(s.series === null || s.series === undefined){
+      s.series = last || 1;
+      if((cnt[s.series] || 0) >= len) s.series++;
+    }
+    cnt[s.series] = (cnt[s.series] || 0) + 1; s.n = cnt[s.series]; last = s.series;
+  });
+}
+function curImage(){
+  if(S.img) return S.img;
+  if(S.view) return {canvas:S.view.canvas, off:S.view.off};
+  return null;
+}
+async function persist(){
+  if(!S.shots.length || !S.t0 || !S.calib) return false;
+  try{
+    var im = curImage(), blob = null;
+    if(S.rec && S.rec.img && S.img) blob = S.rec.img;
+    else if(im) blob = await toBlob(im.canvas);
+    var rec = {
+      id:S.t0, mode:S.meta.mode, t0:S.t0, tEnd:S.meta.tEnd,
+      tgt:{name:S.t.name, cal:S.t.cal, d10:S.t.d10, step:S.t.step}, dist:S.dist, len:S.len,
+      calib:{cx:S.calib.cx, cy:S.calib.cy, ppm:S.calib.ppm}, off:im ? {x:im.off.x, y:im.off.y} : {x:0, y:0}, img:blob,
+      shots:S.shots.map(plainShot), note:S.meta.note || '', analysis:analysisOf(), saved:Date.now(), v:3
+    };
+    await dbPut(rec); S.rec = rec; S.dbOk = true;
+    return true;
+  }catch(e){ S.dbOk = false; return false; }
+}
+
+// ---------- Datei ausgeben (Teilen-Dialog, sonst Download) ----------
+async function deliverFile(data, name, mime){
+  var blob = new Blob([data], {type:mime});
+  try{
+    var f = new File([blob], name, {type:mime});
+    if(navigator.canShare && navigator.canShare({files:[f]})){ await navigator.share({files:[f], title:name}); return 'ok'; }
+  }catch(e){ if(e && e.name === 'AbortError') return 'abbruch'; }
+  var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click();
+  setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 4000);
+  return 'ok';
+}
+function fileBase(){
+  var d = new Date(S.t0 || Date.now());
+  return 'trefferbild-' + d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) + '-' + pad(d.getHours()) + pad(d.getMinutes());
+}
+var dateStr = function(ts){ var d = new Date(ts); return pad(d.getDate()) + '.' + pad(d.getMonth() + 1) + '.' + d.getFullYear(); };
+
+// ---------- Verlauf ----------
+function histRow(rec){
+  var b = document.createElement('button'); b.type = 'button';
+  var a = document.createElement('span'), c = document.createElement('span'), an = rec.analysis;
+  a.textContent = dateStr(rec.t0) + ' · ' + (rec.mode === 'upload' ? 'Foto · ' : '') + rec.tgt.name;
+  c.textContent = (an ? an.n : rec.shots.length) + ' Sch. · ' + (an ? an.dec.toFixed(1) : '–');
+  b.appendChild(a); b.appendChild(c);
+  b.addEventListener('click', function(){ openRecord(rec, 'hist'); });
+  return b;
+}
+async function showHist(){
+  show('v-hist'); $('histMsg').textContent = ''; $('btnBackup').textContent = 'Sicherung erstellen'; S.backup = null;
+  var list = $('histList'); list.innerHTML = ''; $('trendBox').hidden = true;
+  var all;
+  try{ all = await dbAll(); }
+  catch(e){ $('histLead').textContent = 'Der Browser-Speicher ist nicht verfügbar. Trainings können hier nicht gespeichert werden, zum Beispiel im privaten Modus.'; return; }
+  all.sort(function(a, b){ return b.t0 - a.t0; });
+  $('histLead').textContent = all.length ? all.length + ' gespeicherte Trainings' : 'Noch keine Trainings gespeichert. Sie erscheinen hier, sobald du eine Serie abschliesst oder ein Training beendest.';
+  all.forEach(function(r){ list.appendChild(histRow(r)); });
+  drawTrends(all);
+}
+function drawTrends(all){
+  var asc = all.filter(function(r){ return r.analysis; }).sort(function(a, b){ return a.t0 - b.t0; }).slice(-30);
+  if(asc.length < 2) return;
+  $('trendBox').hidden = false;
+  var dates = asc.map(function(r){ var d = new Date(r.t0); return pad(d.getDate()) + '.' + pad(d.getMonth() + 1) + '.'; });
+  drawTrend($('trend1'), asc.map(function(r){ return r.analysis.avg; }), dates, 2);
+  drawTrend($('trend2'), asc.map(function(r){ return r.analysis.meanR; }), dates, 1);
+}
+function drawTrend(cv, vals, dates, digits){
+  var css = getComputedStyle(document.documentElement), col = function(n){ return css.getPropertyValue(n).trim(); };
+  var W = Math.max(240, cv.parentNode.clientWidth), H = 140, dpr = window.devicePixelRatio || 1;
+  cv.width = Math.round(W*dpr); cv.height = Math.round(H*dpr); cv.style.width = W + 'px'; cv.style.height = H + 'px';
+  var c = cv.getContext('2d'); c.setTransform(dpr, 0, 0, dpr, 0, 0); c.clearRect(0, 0, W, H);
+  var mn = Math.min.apply(null, vals), mx = Math.max.apply(null, vals);
+  if(mx - mn < 1e-6){ mx += 0.5; mn -= 0.5; }
+  var pv = (mx - mn)*0.15; mn -= pv; mx += pv;
+  var L = 40, R = 12, T = 10, B = 24, pw = W - L - R, ph = H - T - B, n = vals.length;
+  var X = function(i){ return L + (n === 1 ? pw/2 : i*pw/(n - 1)); }, Y = function(v){ return T + ph*(1 - (v - mn)/(mx - mn)); };
+  c.font = '11px "IBM Plex Mono",monospace'; c.fillStyle = col('--muted'); c.strokeStyle = col('--line'); c.lineWidth = 1;
+  for(var g = 0; g <= 2; g++){
+    var v = mn + (mx - mn)*g/2, y = Y(v);
+    c.beginPath(); c.moveTo(L, y); c.lineTo(W - R, y); c.stroke();
+    c.textAlign = 'right'; c.fillText(v.toFixed(digits), L - 6, y + 4);
+  }
+  c.textAlign = 'left'; c.fillText(dates[0], L, H - 6);
+  c.textAlign = 'right'; c.fillText(dates[n - 1], W - R, H - 6);
+  c.beginPath(); vals.forEach(function(v, i){ if(i) c.lineTo(X(i), Y(v)); else c.moveTo(X(i), Y(v)); });
+  c.lineWidth = 2; c.strokeStyle = col('--accent'); c.lineJoin = 'round'; c.stroke();
+  vals.forEach(function(v, i){
+    c.beginPath(); c.arc(X(i), Y(v), i === n - 1 ? 5 : 3, 0, Math.PI*2);
+    c.fillStyle = i === n - 1 ? col('--accent') : col('--surface'); c.fill(); c.lineWidth = 2; c.strokeStyle = col('--accent'); c.stroke();
+  });
+}
+$('btnHist').addEventListener('click', function(){ showHist(); });
+$('btnHistBack').addEventListener('click', function(){ show('v-setup'); renderHistory(); });
+$('btnBackup').addEventListener('click', async function(){
+  var msg = $('histMsg'), btn = $('btnBackup');
+  if(S.backup){
+    var r = await deliverFile(S.backup.json, S.backup.name, 'application/json');
+    msg.textContent = r === 'abbruch' ? 'Abgebrochen.' : 'Sicherung bereit.'; return;
+  }
+  msg.textContent = 'Sicherung wird erstellt …';
+  try{
+    var all = await dbAll(), out = [];
+    for(var i = 0; i < all.length; i++){
+      var rec = Object.assign({}, all[i]); rec.img = rec.img ? await blobToDataUrl(rec.img) : null; out.push(rec);
+    }
+    var d = new Date();
+    S.backup = {json:JSON.stringify({app:'trefferbild', version:3, created:Date.now(), trainings:out}), name:'trefferbild-sicherung-' + d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) + '.json'};
+    btn.textContent = 'Sicherung speichern';
+    msg.textContent = all.length + ' Trainings bereit. Tippe nochmals auf den Knopf, um die Datei zu speichern oder zu teilen.';
+  }catch(e){ msg.textContent = 'Die Sicherung konnte nicht erstellt werden.'; }
+});
+$('btnRestore').addEventListener('click', function(){ $('restoreIn').click(); });
+$('restoreIn').addEventListener('change', async function(ev){
+  var f = ev.target.files && ev.target.files[0]; ev.target.value = ''; if(!f) return;
+  var msg = $('histMsg'); msg.textContent = 'Sicherung wird gelesen …';
+  try{
+    var data = JSON.parse(await f.text());
+    if(!data || data.app !== 'trefferbild' || !Array.isArray(data.trainings)) throw new Error('Format');
+    var have = {}; (await dbAll()).forEach(function(r){ have[r.id] = true; });
+    var added = 0;
+    for(var i = 0; i < data.trainings.length; i++){
+      var r = data.trainings[i]; if(!r || have[r.id] || !r.shots || !r.tgt || !r.calib) continue;
+      if(r.img){ r.img = await (await fetch(r.img)).blob(); }
+      await dbPut(r); added++;
+    }
+    await showHist();
+    $('histMsg').textContent = added + ' Trainings übernommen, ' + (data.trainings.length - added) + ' waren schon vorhanden.';
+  }catch(e){ msg.textContent = 'Diese Datei ist keine gültige Trefferbild-Sicherung.'; }
+});
+
+async function openRecord(rec, from){
+  S.t = {name:rec.tgt.name, cal:rec.tgt.cal, d10:rec.tgt.d10, step:rec.tgt.step};
+  S.dist = rec.dist; S.len = rec.len || 10; S.t0 = rec.t0;
+  S.calib = {cx:rec.calib.cx, cy:rec.calib.cy, ppm:rec.calib.ppm};
+  S.shots = rec.shots.map(function(s){ return Object.assign({}, s); });
+  S.meta = {mode:rec.mode || 'live', tEnd:rec.tEnd || null, note:rec.note || ''};
+  S.rec = rec; S.from = from || 'hist'; S.view = null; S.img = null; S.upload = false;
+  if(rec.img){ try{ S.img = {canvas:await blobToCanvas(rec.img), off:{x:rec.off.x, y:rec.off.y}}; }catch(e){} }
+  regroup(); S.phase = 'summary';
+  showSummary();
+}
+
+// ---------- PDF (ohne Bibliothek) ----------
+function pdfStr(s){
+  s = String(s).replace(/σ/g, 's').replace(/Δ/g, 'D').replace(/≈/g, 'ca. ').replace(/−/g, '-').replace(/≥/g, '>=').replace(/→/g, '->')
+    .replace(/–/g, '\x96').replace(/—/g, '\x97').replace(/„/g, '\x84').replace(/“/g, '\x93').replace(/”/g, '\x94').replace(/’/g, '\x92');
+  var o = '', i, c;
+  for(i = 0; i < s.length; i++){ c = s.charCodeAt(i); o += c < 256 ? s.charAt(i) : '?'; }
+  return o;
+}
+function latin1(s){ var b = new Uint8Array(s.length), i; for(i = 0; i < s.length; i++) b[i] = s.charCodeAt(i) & 255; return b; }
+var HW = {' ':278, '!':278, '"':355, '#':556, '$':556, '%':889, '&':667, "'":191, '(':333, ')':333, '*':389, '+':584, ',':278, '-':333, '.':278, '/':278, ':':278, ';':278, '=':584, '?':556, '|':260, i:222, j:222, l:222, t:278, f:278, I:278, r:333, m:833, w:722, M:833, W:944, '\xB7':278, '\x96':556};
+function tw(s, size, bold){
+  s = pdfStr(s); var w = 0, i, ch;
+  for(i = 0; i < s.length; i++){
+    ch = s.charAt(i);
+    if(HW[ch]) w += HW[ch]; else if(ch >= '0' && ch <= '9') w += 556; else if(ch >= 'A' && ch <= 'Z') w += 700; else w += 540;
+  }
+  return w*size/1000*(bold ? 1.07 : 1);
+}
+function PdfDoc(){
+  var W = 595, H = 842, pages = [], imgs = [];
+  var n2 = function(v){ return String(Math.round(v*100)/100); };
+  var esc = function(s){ return pdfStr(s).replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)'); };
+  var rgb = function(c){ return n2(c[0]) + ' ' + n2(c[1]) + ' ' + n2(c[2]); };
+  this.addImage = function(bytes, w, h){ imgs.push({bytes:bytes, w:w, h:h}); return 'Im' + imgs.length; };
+  this.newPage = function(){
+    var ops = [];
+    var pg = {
+      W:W, H:H,
+      text:function(x, y, s, size, o){
+        o = o || {};
+        var w = tw(s, size, o.bold), xx = o.align === 'right' ? x - w : (o.align === 'center' ? x - w/2 : x);
+        ops.push('BT /' + (o.bold ? 'F2' : 'F1') + ' ' + n2(size) + ' Tf ' + rgb(o.color || [0.08, 0.1, 0.09]) + ' rg ' + n2(xx) + ' ' + n2(H - y) + ' Td (' + esc(s) + ') Tj ET');
+        return w;
+      },
+      line:function(x1, y1, x2, y2, o){
+        o = o || {};
+        ops.push('q ' + rgb(o.color || [0.7, 0.72, 0.7]) + ' RG ' + n2(o.lw || 0.5) + ' w ' + (o.dash ? '[' + o.dash + '] 0 d ' : '') + n2(x1) + ' ' + n2(H - y1) + ' m ' + n2(x2) + ' ' + n2(H - y2) + ' l S Q');
+      },
+      circle:function(cx, cy, r, o){
+        o = o || {};
+        var k = 0.5523*r, X = cx, Y = H - cy, p = n2(X + r) + ' ' + n2(Y) + ' m ' +
+          n2(X + r) + ' ' + n2(Y + k) + ' ' + n2(X + k) + ' ' + n2(Y + r) + ' ' + n2(X) + ' ' + n2(Y + r) + ' c ' +
+          n2(X - k) + ' ' + n2(Y + r) + ' ' + n2(X - r) + ' ' + n2(Y + k) + ' ' + n2(X - r) + ' ' + n2(Y) + ' c ' +
+          n2(X - r) + ' ' + n2(Y - k) + ' ' + n2(X - k) + ' ' + n2(Y - r) + ' ' + n2(X) + ' ' + n2(Y - r) + ' c ' +
+          n2(X + k) + ' ' + n2(Y - r) + ' ' + n2(X + r) + ' ' + n2(Y - k) + ' ' + n2(X + r) + ' ' + n2(Y) + ' c h ';
+        var op = o.fill && o.stroke ? 'B' : (o.fill ? 'f' : 'S');
+        ops.push('q ' + (o.fill ? rgb(o.fill) + ' rg ' : '') + (o.stroke || !o.fill ? rgb(o.stroke || [0.7, 0.72, 0.7]) + ' RG ' : '') + n2(o.lw || 0.5) + ' w ' + (o.dash ? '[' + o.dash + '] 0 d ' : '') + p + op + ' Q');
+      },
+      image:function(name, x, y, w, h){ ops.push('q ' + n2(w) + ' 0 0 ' + n2(h) + ' ' + n2(x) + ' ' + n2(H - y - h) + ' cm /' + name + ' Do Q'); },
+      ops:ops
+    };
+    pages.push(pg); return pg;
+  };
+  this.build = function(){
+    var chunks = [], offs = [], pos = 0, n;
+    var put = function(x){ var b = typeof x === 'string' ? latin1(x) : x; chunks.push(b); pos += b.length; };
+    var obj = function(num, parts){ offs[num] = pos; put(num + ' 0 obj\n'); parts.forEach(put); put('\nendobj\n'); };
+    var imgBase = 5, pageBase = imgBase + imgs.length, total = pageBase + pages.length*2;
+    put('%PDF-1.4\n%\xE2\xE3\xCF\xD3\n');
+    obj(1, ['<< /Type /Catalog /Pages 2 0 R >>']);
+    obj(2, ['<< /Type /Pages /Kids [' + pages.map(function(p, i){ return (pageBase + i*2 + 1) + ' 0 R'; }).join(' ') + '] /Count ' + pages.length + ' >>']);
+    obj(3, ['<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>']);
+    obj(4, ['<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>']);
+    imgs.forEach(function(im, i){
+      obj(imgBase + i, ['<< /Type /XObject /Subtype /Image /Width ' + im.w + ' /Height ' + im.h + ' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ' + im.bytes.length + ' >>\nstream\n', im.bytes, '\nendstream']);
+    });
+    var xo = imgs.map(function(im, k){ return '/Im' + (k + 1) + ' ' + (imgBase + k) + ' 0 R'; }).join(' ');
+    pages.forEach(function(p, i){
+      var cn = pageBase + i*2, content = latin1(p.ops.join('\n'));
+      obj(cn, ['<< /Length ' + content.length + ' >>\nstream\n', content, '\nendstream']);
+      obj(cn + 1, ['<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ' + W + ' ' + H + '] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> /XObject << ' + xo + ' >> >> /Contents ' + cn + ' 0 R >>']);
+    });
+    var xref = pos;
+    put('xref\n0 ' + total + '\n0000000000 65535 f \n');
+    for(n = 1; n < total; n++) put(('0000000000' + offs[n]).slice(-10) + ' 00000 n \n');
+    put('trailer\n<< /Size ' + total + ' /Root 1 0 R >>\nstartxref\n' + xref + '\n%%EOF');
+    var out = new Uint8Array(pos), at = 0;
+    chunks.forEach(function(c){ out.set(c, at); at += c.length; });
+    return out;
+  };
+}
+function wrapText(s, size, maxW){
+  var words = String(s).split(' '), lines = [], cur = '';
+  words.forEach(function(w){
+    var t = cur ? cur + ' ' + w : w;
+    if(tw(t, size) > maxW && cur){ lines.push(cur); cur = w; } else cur = t;
+  });
+  if(cur) lines.push(cur);
+  return lines;
+}
+// Scheibenausschnitt mit Ringen und Treffern als JPEG (synchron, für das PDF)
+function annotatedJpeg(){
+  var im = curImage();
+  if(!im || !S.calib) return null;
+  try{
+    var ppm = S.calib.ppm, t = S.t, R1 = (t.d10/2 + 9*t.step/2)*ppm*1.08;
+    var cxp = S.calib.cx + im.off.x, cyp = S.calib.cy + im.off.y;
+    var x0 = Math.max(0, Math.floor(cxp - R1)), y0 = Math.max(0, Math.floor(cyp - R1));
+    var x1 = Math.min(im.canvas.width, Math.ceil(cxp + R1)), y1 = Math.min(im.canvas.height, Math.ceil(cyp + R1));
+    var cw = x1 - x0, ch = y1 - y0;
+    if(cw < 10 || ch < 10) return null;
+    var sc = Math.min(1, 1100/Math.max(cw, ch)), c = document.createElement('canvas');
+    c.width = Math.round(cw*sc); c.height = Math.round(ch*sc);
+    var ctx = c.getContext('2d');
+    ctx.drawImage(im.canvas, x0, y0, cw, ch, 0, 0, c.width, c.height);
+    ctx.setTransform(sc, 0, 0, sc, -x0*sc, -y0*sc);
+    var lw = 2/sc;
+    drawRings(ctx, cxp, cyp, ppm, t, lw);
+    var rad = Math.max(lw*2.6, t.cal/2*ppm), fs = Math.max(12, 16/sc);
+    S.shots.forEach(function(s, i){
+      var x = s.rx + im.off.x, y = s.ry + im.off.y;
+      ctx.beginPath(); ctx.arc(x, y, rad, 0, Math.PI*2); ctx.fillStyle = 'rgba(255,176,0,.85)'; ctx.fill();
+      ctx.lineWidth = lw*1.4; ctx.strokeStyle = '#111'; ctx.stroke();
+      label(ctx, String(i + 1), x + rad + lw*2, y - rad - lw, fs);
+    });
+    var url = c.toDataURL('image/jpeg', 0.88), bin = atob(url.split(',')[1]), bytes = new Uint8Array(bin.length), i;
+    for(i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return {bytes:bytes, w:c.width, h:c.height};
+  }catch(e){ return null; }
+}
+function reportPdf(){
+  var d = new PdfDoc(), M = 42, W = 595, CW = W - 2*M, pg, pageNo = 0, y;
+  var INK = [0.08, 0.1, 0.09], MUT = [0.35, 0.4, 0.37], ACC = [0.11, 0.36, 0.28], LINE = [0.78, 0.8, 0.78], HIT_C = [1, 0.69, 0];
+  var t = S.t, shots = S.shots, all = seriesStats(shots, t, S.dist), upl = S.meta.mode === 'upload';
+  function newPg(){
+    pg = d.newPage(); pageNo++;
+    pg.text(M, 36, 'Trefferbild', 12, {bold:true, color:ACC});
+    pg.text(W - M, 36, t.name + ' · ' + S.dist + ' m', 9, {align:'right', color:MUT});
+    pg.line(M, 44, W - M, 44, {color:LINE});
+    pg.text(W/2, 816, 'Trefferbild · Version 3 · Seite ' + pageNo, 8, {align:'center', color:MUT});
+    return 66;
+  }
+  function ensure(h){ if(y + h > 790) y = newPg(); }
+  function table(cols, rows){
+    ensure(30);
+    cols.forEach(function(c){ pg.text(c[1], y, c[0], 8.5, {bold:true, color:MUT, align:c[2]}); });
+    pg.line(M, y + 4, W - M, y + 4, {color:LINE}); y += 16;
+    rows.forEach(function(r){
+      if(y + 14 > 790){ y = newPg(); cols.forEach(function(c){ pg.text(c[1], y, c[0], 8.5, {bold:true, color:MUT, align:c[2]}); }); pg.line(M, y + 4, W - M, y + 4, {color:LINE}); y += 16; }
+      r.forEach(function(v, i){ pg.text(cols[i][1], y, String(v), 9, {align:cols[i][2]}); });
+      y += 14;
+    });
+  }
+  y = newPg();
+  pg.text(M, y + 20, 'Trainingsbericht', 22, {bold:true});
+  var when = upl ? 'Auswertung eines Scheibenfotos vom ' + dateStr(S.t0)
+    : dateStr(S.t0) + ' · Start ' + hms(S.t0) + (S.meta.tEnd ? ' · Dauer ' + dur((S.meta.tEnd - S.t0)/1000) : '');
+  pg.text(M, y + 38, when, 10, {color:MUT});
+  if(!all){ pg.text(M, y + 80, 'Keine Schüsse erfasst.', 11); return d.build(); }
+  var bw = pg.text(M, y + 92, all.dec.toFixed(1), 40, {bold:true, color:ACC});
+  pg.text(M + bw + 14, y + 72, 'Dezimal gesamt · ' + all.n + ' Schuss', 10, {color:MUT});
+  pg.text(M + bw + 14, y + 88, 'Durchschnitt ' + fmt(all.dec/all.n) + ' pro Schuss · ' + all.rings + ' Ringe', 10, {color:MUT});
+
+  // Trefferbild (Vektor)
+  var D = 232, gx = M + D/2, gy = y + 118 + D/2;
+  var r10 = t.d10/2, rs = t.step/2, maxD = Math.max.apply(null, shots.map(function(s){ return s.dist; }).concat([0]));
+  var k = Math.max(2, Math.min(9, Math.ceil((maxD + t.cal/2 - r10)/rs) + 1)), Rv = r10 + k*rs, sc = (D/2 - 6)/Rv, i;
+  for(i = 0; i <= k; i++) pg.circle(gx, gy, (r10 + i*rs)*sc, {stroke:LINE, lw:0.7});
+  pg.line(gx, gy - D/2, gx, gy + D/2, {color:LINE, lw:0.4}); pg.line(gx - D/2, gy, gx + D/2, gy, {color:LINE, lw:0.4});
+  for(i = 1; i <= k; i++) pg.text(gx + 2, gy - (r10 + (i - 0.5)*rs)*sc + 3, String(10 - i), 7, {color:MUT});
+  if(shots.length > 1) pg.circle(gx + all.mpi.x*sc, gy - all.mpi.y*sc, Math.max(3, all.meanR*sc), {stroke:ACC, lw:1, dash:'3 2'});
+  shots.forEach(function(s){
+    var x = gx + s.x*sc, yy = gy - s.y*sc, r = Math.max(2.4, t.cal/2*sc);
+    pg.circle(x, yy, r, {fill:HIT_C, stroke:[0.1, 0.1, 0.1], lw:0.7});
+    pg.text(x + r + 1.5, yy - r, String(s.n), 6.5, {color:INK});
+  });
+  pg.line(gx + all.mpi.x*sc - 6, gy - all.mpi.y*sc, gx + all.mpi.x*sc + 6, gy - all.mpi.y*sc, {color:ACC, lw:1.6});
+  pg.line(gx + all.mpi.x*sc, gy - all.mpi.y*sc - 6, gx + all.mpi.x*sc, gy - all.mpi.y*sc + 6, {color:ACC, lw:1.6});
+
+  // Kennzahlen rechts
+  var rows = statsRows(all), ry = y + 140;
+  pg.text(300, y + 122, 'Kennzahlen', 11, {bold:true, color:ACC});
+  rows.forEach(function(r){
+    pg.text(300, ry, r[0], 9, {color:MUT}); pg.text(W - M, ry, r[1], 9.5, {bold:true, align:'right'});
+    pg.line(300, ry + 5, W - M, ry + 5, {color:[0.9, 0.91, 0.9], lw:0.4}); ry += 17;
+  });
+  y = Math.max(gy + D/2, ry) + 22;
+
+  ensure(60);
+  pg.text(M, y, 'Hinweise', 11, {bold:true, color:ACC}); y += 16;
+  hintList(all).forEach(function(h){
+    wrapText(h, 10, CW).forEach(function(l){ ensure(16); pg.text(M, y, l, 10); y += 14; });
+    y += 4;
+  });
+  if(S.meta.note){
+    ensure(40); y += 6; pg.text(M, y, 'Notiz', 11, {bold:true, color:ACC}); y += 16;
+    String(S.meta.note).split(/\r?\n/).forEach(function(p){ wrapText(p, 10, CW).forEach(function(l){ ensure(16); pg.text(M, y, l, 10); y += 14; }); });
+  }
+  y += 14; ensure(60);
+  pg.text(M, y, 'Serien', 11, {bold:true, color:ACC}); y += 16;
+  table([['Serie', M, 'left'], ['Schuss', M + 95, 'right'], ['Dezimal', M + 160, 'right'], ['Ringe', M + 215, 'right'], ['Streukreis mm', M + 300, 'right'], ['x mm', M + 355, 'right'], ['y mm', M + 405, 'right'], ['Ø s', M + 470, 'right']],
+    S.series.map(function(s){ var st = s.stats; return [s.no, st.n, st.dec.toFixed(1), st.rings, fmt(st.spread), sgn(st.mpi.x), sgn(st.mpi.y), st.meanInt !== null ? fmt(st.meanInt, 0) : '–']; }));
+
+  y = newPg();
+  pg.text(M, y, 'Alle Schüsse', 14, {bold:true}); y += 22;
+  table([['Serie', M, 'left'], ['Nr', M + 55, 'right'], ['Uhrzeit', M + 120, 'right'], ['Abstand s', M + 185, 'right'], ['Dezimal', M + 250, 'right'], ['Ring', M + 300, 'right'], ['x mm', M + 360, 'right'], ['y mm', M + 420, 'right'], ['Erkennung', M + 511, 'right']],
+    shots.map(function(s, j){
+      var prev = j ? shots[j - 1] : null, timed = s.ts !== null && s.ts !== undefined;
+      return [s.series, s.n, timed ? hms(s.ts) : '–', timed && prev && prev.ts !== null && prev.ts !== undefined ? ((s.ts - prev.ts)/1000).toFixed(0) : '–', s.dec.toFixed(1), s.ring, sgn(s.x), sgn(s.y), s.auto ? 'automatisch' : 'von Hand'];
+    }));
+
+  var ph = annotatedJpeg();
+  if(ph){
+    y = newPg();
+    pg.text(M, y, 'Scheibenfoto', 14, {bold:true}); y += 14;
+    var name = d.addImage(ph.bytes, ph.w, ph.h), scl = Math.min(CW/ph.w, 700/ph.h);
+    pg.image(name, M, y, ph.w*scl, ph.h*scl);
+    pg.text(M, y + ph.h*scl + 16, 'Grün: Ringe der Vorlage. Orange: erfasste Treffer in der Reihenfolge der Erfassung.', 9, {color:MUT});
+  }
+  return d.build();
+}
+
+// ---------- Editor ----------
+var E = null;
+function edSize(){
+  if(!E) return;
+  var wrap = $('edWrap'), cv = $('cvEdit'), w = Math.max(200, wrap.clientWidth), h = Math.round(Math.min(window.innerHeight*0.6, w*1.15)), dpr = Math.min(2, window.devicePixelRatio || 1);
+  wrap.style.height = h + 'px';
+  cv.width = Math.round(w*dpr); cv.height = Math.round(h*dpr); cv.style.width = w + 'px'; cv.style.height = h + 'px';
+  E.w = w; E.h = h; E.dpr = dpr;
+}
+function edFit(){
+  var R1 = (E.t.d10/2 + 9*E.t.step/2)*E.c.ppm*1.06, s = Math.min(E.w, E.h)/(2*R1);
+  E.fit = s; E.v = {s:s, tx:E.w/2 - s*E.c.cx, ty:E.h/2 - s*E.c.cy};
+}
+function edOpen(o){
+  E = {img:o.img, off:o.off, c:{cx:o.calib.cx, cy:o.calib.cy, ppm:o.calib.ppm}, t:o.t, shots:o.shots.map(function(s){ return Object.assign({}, s); }),
+    cands:(o.cands || []).slice(), sel:-1, add:false, rings:true, v:{s:1, tx:0, ty:0}, fit:1, o:o, ptrs:{}, w:0, h:0, dpr:1, G:null};
+  $('edTitle').textContent = o.title; $('edLead').textContent = o.lead || '';
+  $('btnEdAdd').classList.remove('on'); $('btnEdAdd').textContent = '+ Treffer setzen'; $('btnEdRings').textContent = 'Ringe ausblenden';
+  show('v-edit'); edSize(); edFit(); edInfo(); edPaint();
+}
+function edPaint(){
+  if(!E) return;
+  var cv = $('cvEdit'), ctx = cv.getContext('2d'), d = E.dpr, s = E.v.s, px = 1/s;
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = '#050706'; ctx.fillRect(0, 0, cv.width, cv.height);
+  ctx.setTransform(s*d, 0, 0, s*d, E.v.tx*d, E.v.ty*d);
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(E.img, -E.off.x, -E.off.y);
+  if(E.rings) drawRings(ctx, E.c.cx, E.c.cy, E.c.ppm, E.t, 1.5*px);
+  var rad = Math.max(E.t.cal/2*E.c.ppm, 5*px), fs = 13*px;
+  E.cands.forEach(function(c){
+    ctx.beginPath(); ctx.setLineDash([4*px, 3*px]); ctx.arc(c.x, c.y, rad + 3*px, 0, Math.PI*2);
+    ctx.lineWidth = 2*px; ctx.strokeStyle = '#3FB6FF'; ctx.stroke(); ctx.setLineDash([]);
+  });
+  E.shots.forEach(function(sh, i){
+    ctx.beginPath(); ctx.arc(sh.rx, sh.ry, rad, 0, Math.PI*2); ctx.fillStyle = 'rgba(255,176,0,.8)'; ctx.fill();
+    ctx.lineWidth = 1.5*px; ctx.strokeStyle = '#111'; ctx.stroke();
+    if(i === E.sel){ ctx.beginPath(); ctx.arc(sh.rx, sh.ry, rad + 4*px, 0, Math.PI*2); ctx.lineWidth = 2.5*px; ctx.strokeStyle = '#fff'; ctx.stroke(); }
+    label(ctx, String(i + 1), sh.rx + rad + 2*px, sh.ry - rad - px, fs);
+  });
+}
+function edInfo(){
+  if(!E) return;
+  var sum = E.shots.reduce(function(p, s){ return p + s.dec; }, 0);
+  var m = E.shots.length + ' Treffer · Summe ' + sum.toFixed(1) + (E.cands.length ? ' · ' + E.cands.length + ' Vorschläge' : '');
+  if(E.sel >= 0 && E.shots[E.sel]){ var s = E.shots[E.sel]; m = 'Treffer ' + (E.sel + 1) + ': ' + s.dec.toFixed(1) + ' (' + sgn(s.x) + ' / ' + sgn(s.y) + ' mm)  ·  ' + m; }
+  $('edMsg').textContent = m; $('edMsg').className = 'msg';
+  $('btnEdDel').disabled = E.sel < 0; $('btnEdAcc').hidden = !E.cands.length;
+  document.querySelectorAll('#edNudge button').forEach(function(b){ b.disabled = E.sel < 0; });
+}
+function edZoomAt(mx, my, f){
+  var ns = Math.max(E.fit*0.5, Math.min(10, E.v.s*f)); f = ns/E.v.s;
+  E.v.tx = mx - (mx - E.v.tx)*f; E.v.ty = my - (my - E.v.ty)*f; E.v.s = ns;
+}
+function edAddShot(x, y, auto, conf){
+  var s = {series:null, n:0, ts:null, rx:x, ry:y, auto:!!auto, conf:conf || 'manuell'};
+  fillShot(s, E.c, E.t); E.shots.push(s); E.sel = E.shots.length - 1;
+}
+function edAccept(i){
+  var c = E.cands.splice(i, 1)[0]; if(!c) return;
+  edAddShot(c.x, c.y, true, 'vorgeschlagen'); edInfo(); edPaint();
+}
+(function(){
+  var cv = $('cvEdit');
+  function pt(ev){ var r = cv.getBoundingClientRect(); return {x:ev.clientX - r.left, y:ev.clientY - r.top}; }
+  function hitShot(p){
+    var best = -1, bd = 1e9;
+    E.shots.forEach(function(sh, i){
+      var dd = Math.hypot(sh.rx*E.v.s + E.v.tx - p.x, sh.ry*E.v.s + E.v.ty - p.y), lim = Math.max(22, E.t.cal/2*E.c.ppm*E.v.s + 10);
+      if(dd <= lim && dd < bd){ bd = dd; best = i; }
+    });
+    return best;
+  }
+  function hitCand(p){
+    var best = -1, bd = 1e9;
+    E.cands.forEach(function(c, i){
+      var dd = Math.hypot(c.x*E.v.s + E.v.tx - p.x, c.y*E.v.s + E.v.ty - p.y), lim = Math.max(24, E.t.cal/2*E.c.ppm*E.v.s + 14);
+      if(dd <= lim && dd < bd){ bd = dd; best = i; }
+    });
+    return best;
+  }
+  cv.addEventListener('pointerdown', function(ev){
+    if(!E) return;
+    try{ cv.setPointerCapture(ev.pointerId); }catch(e){}
+    E.ptrs[ev.pointerId] = pt(ev);
+    var ids = Object.keys(E.ptrs);
+    if(ids.length >= 2){
+      var a = E.ptrs[ids[0]], b = E.ptrs[ids[1]];
+      E.G = {type:'pinch', d:Math.hypot(a.x - b.x, a.y - b.y), mx:(a.x + b.x)/2, my:(a.y + b.y)/2};
+    } else {
+      var p = E.ptrs[ev.pointerId], hs = hitShot(p), hc = hs < 0 ? hitCand(p) : -1;
+      E.G = {type:hs >= 0 ? 'shot' : 'pan', i:hs, c:hc, sx:p.x, sy:p.y, lx:p.x, ly:p.y, moved:false};
+      if(hs >= 0){ E.sel = hs; edInfo(); edPaint(); }
+    }
+    ev.preventDefault();
+  });
+  cv.addEventListener('pointermove', function(ev){
+    if(!E || !E.ptrs[ev.pointerId] || !E.G) return;
+    var p = pt(ev), G = E.G; E.ptrs[ev.pointerId] = p;
+    if(G.type === 'pinch'){
+      var ids = Object.keys(E.ptrs); if(ids.length < 2) return;
+      var a = E.ptrs[ids[0]], b = E.ptrs[ids[1]], dd = Math.hypot(a.x - b.x, a.y - b.y), mx = (a.x + b.x)/2, my = (a.y + b.y)/2;
+      if(G.d > 0 && dd > 0) edZoomAt(mx, my, dd/G.d);
+      E.v.tx += mx - G.mx; E.v.ty += my - G.my; G.d = dd; G.mx = mx; G.my = my; edPaint();
+    } else {
+      if(!G.moved && Math.hypot(p.x - G.sx, p.y - G.sy) > 6) G.moved = true;
+      if(!G.moved) return;
+      if(G.type === 'shot'){
+        var sh = E.shots[G.i]; sh.rx += (p.x - G.lx)/E.v.s; sh.ry += (p.y - G.ly)/E.v.s;
+        fillShot(sh, E.c, E.t); sh.auto = false; sh.conf = 'manuell';
+      } else { E.v.tx += p.x - G.lx; E.v.ty += p.y - G.ly; }
+      G.lx = p.x; G.ly = p.y; edInfo(); edPaint();
+    }
+    ev.preventDefault();
+  });
+  function end(ev){
+    if(!E) return;
+    var p = E.ptrs[ev.pointerId], G = E.G; delete E.ptrs[ev.pointerId];
+    if(!G) return;
+    if(G.type === 'pan' && !G.moved && p){
+      if(G.c >= 0) edAccept(G.c);
+      else if(E.add){ var r = {x:(p.x - E.v.tx)/E.v.s, y:(p.y - E.v.ty)/E.v.s}; edAddShot(r.x, r.y, false, 'manuell'); edInfo(); edPaint(); }
+      else { E.sel = -1; edInfo(); edPaint(); }
+    }
+    if(!Object.keys(E.ptrs).length || G.type === 'pinch') E.G = null;
+  }
+  cv.addEventListener('pointerup', end);
+  cv.addEventListener('pointercancel', end);
+  cv.addEventListener('wheel', function(ev){
+    if(!E) return; var p = pt(ev); edZoomAt(p.x, p.y, ev.deltaY < 0 ? 1.2 : 1/1.2); edPaint(); ev.preventDefault();
+  }, {passive:false});
+  window.addEventListener('resize', function(){ if(E && !$('v-edit').hidden){ edSize(); edPaint(); } });
+})();
+$('btnEdAdd').addEventListener('click', function(){
+  E.add = !E.add; this.classList.toggle('on', E.add); this.textContent = E.add ? '+ Treffer setzen: an' : '+ Treffer setzen';
+  $('edMsg').textContent = E.add ? 'Tippe auf einen Einschlag, um einen Treffer zu setzen.' : ''; if(!E.add) edInfo();
+});
+$('btnEdDel').addEventListener('click', function(){ if(E.sel < 0) return; E.shots.splice(E.sel, 1); E.sel = -1; edInfo(); edPaint(); });
+$('btnEdAcc').addEventListener('click', function(){ while(E.cands.length){ var c = E.cands.shift(); edAddShot(c.x, c.y, true, 'vorgeschlagen'); } E.sel = -1; edInfo(); edPaint(); });
+$('btnEdRings').addEventListener('click', function(){ E.rings = !E.rings; this.textContent = E.rings ? 'Ringe ausblenden' : 'Ringe einblenden'; edPaint(); });
+$('btnEdFit').addEventListener('click', function(){ edFit(); edPaint(); });
+document.querySelectorAll('#edNudge button').forEach(function(b){
+  b.addEventListener('click', function(){
+    if(!E || E.sel < 0) return; var s = E.shots[E.sel];
+    s.rx += +b.dataset.x; s.ry += +b.dataset.y; fillShot(s, E.c, E.t); s.auto = false; s.conf = 'manuell'; edInfo(); edPaint();
+  });
+});
+$('btnEdDone').addEventListener('click', function(){
+  if(!E.shots.length){ $('edMsg').className = 'msg warn'; $('edMsg').textContent = 'Setze mindestens einen Treffer.'; return; }
+  var o = E.o, shots = E.shots; E = null; o.onDone(shots);
+});
+$('btnEdCancel').addEventListener('click', function(){ var o = E.o; E = null; o.onCancel(); });
+
+// ---------- Foto-Auswertung (Upload) ----------
+function startUploadEdit(){
+  var C = S.calib, ref = S.ref, cands = [];
+  try{ cands = findHoles(ref.g, ref.w, ref.h, C.cx, C.cy, C.ppm, S.t, 30).map(function(c){ return {x:c.x, y:c.y}; }); }catch(e){}
+  S.t0 = Date.now(); S.meta = {mode:'upload', tEnd:S.t0, note:''}; S.shots = []; S.series = []; S.rec = null; S.from = 'new';
+  S.img = {canvas:ref.canvas, off:{x:0, y:0}}; S.view = null; S.phase = 'edit';
+  edOpen({
+    img:ref.canvas, off:{x:0, y:0}, calib:C, t:S.t, shots:[], cands:cands, mode:'upload', title:'Treffer markieren',
+    lead:cands.length ? 'Blaue gestrichelte Kreise sind Vorschläge. Tippe darauf, um sie zu übernehmen, oder übernimm alle. Fehlende Treffer setzt du mit „+ Treffer setzen“.'
+      : 'Es wurden keine Vorschläge gefunden. Setze die Treffer mit „+ Treffer setzen“. Zoome mit zwei Fingern.',
+    onDone:async function(shots){
+      renumber(shots, 'upload', S.len); shots.forEach(function(s){ s.ts = null; });
+      S.shots = shots; regroup(); S.phase = 'summary'; await persist(); showSummary();
+    },
+    onCancel:function(){ S.phase = 'setup'; show('v-calib'); }
+  });
+}
+function editCurrent(){
+  var im = curImage(); if(!im) return;
+  $('sheet').hidden = true; S.phase = 'edit';
+  edOpen({
+    img:im.canvas, off:im.off, calib:S.calib, t:S.t, shots:S.shots, cands:[], mode:S.meta.mode, title:'Treffer bearbeiten',
+    lead:'Ziehe einen Treffer an die richtige Stelle oder wähle ihn aus und verschiebe ihn mit den Pfeilen. Zoome mit zwei Fingern.',
+    onDone:async function(shots){
+      renumber(shots, S.meta.mode, S.len); S.shots = shots; regroup(); S.phase = 'summary'; await persist(); showSummary();
+    },
+    onCancel:function(){ S.phase = 'summary'; showSummary(); }
+  });
+}
 
 initSetup();
 })();
